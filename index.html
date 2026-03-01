@@ -1,0 +1,2662 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Edificações - Cantagalo</title>
+    <base href="/webgis-cantagalo/">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        
+        .control-panel {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-width: 320px;
+        }
+        
+        .control-panel h2 {
+            color: #2c3e50;
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3498db;
+        }
+        
+        .custom-popup {
+            min-width: 320px;
+            max-width: 350px;
+            font-family: 'Segoe UI', sans-serif;
+            background: white;
+        }
+        
+        .popup-content {
+            padding: 10px 5px;
+        }
+        
+        .popup-row {
+            display: flex;
+            margin: 8px 0;
+            padding: 5px 10px;
+            border-bottom: 1px dotted #ecf0f1;
+        }
+        
+        .popup-label {
+            font-weight: 600;
+            color: #34495e;
+            width: 140px;
+            font-size: 0.9rem;
+        }
+        
+        .popup-value {
+            color: #2c3e50;
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .popup-value strong {
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+        
+        .popup-foto {
+            margin: 15px 0 5px 0;
+            text-align: center;
+            border-top: 2px solid #3498db;
+            padding-top: 15px;
+        }
+        
+        .popup-foto img {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            cursor: pointer;
+            border: 2px solid #fff;
+        }
+        
+        .popup-foto img:hover {
+            transform: scale(1.02);
+        }
+        
+        .foto-nome {
+            margin-top: 8px;
+            color: #7f8c8d;
+            font-size: 0.75rem;
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 6px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid black;
+            font-size: 0.95rem;
+        }
+        
+        .legend-circle {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            background: black;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+        }
+        
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid white;
+            border-radius: 8px;
+        }
+        
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div id="imageModal" class="modal">
+        <span class="close" onclick="fecharModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+    
+    <div class="control-panel">
+        <h2>📋 Cadastro de Edificações</h2>
+        <p><strong>Município:</strong> Cantagalo</p>
+        <p><strong>Total de pontos:</strong> <span id="totalPontos">108</span></p>
+        <p style="margin-top: 10px; font-size: 0.85rem; color: #3498db;">
+            🌍 Use o controle no canto superior direito para trocar o mapa base
+        </p>
+    </div>
+    
+    <div class="legend">
+        <span class="legend-circle"></span> Edificações cadastradas (<span id="legendTotal">108</span>)
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span>Carregando mapa com 108 pontos...</span>
+    </div>
+
+    <script>
+        // ===== TODOS OS 108 PONTOS COMPLETOS =====
+        var dadosGeoJSON = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": 1,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.371461008999972, -22.002711635999958]
+                    },
+                    "properties": {
+                        "ObjectID": 1,
+                        "Num_Sequencial": 1,
+                        "Edificação": 1,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "f51a5e74-5007-41b6-9ba6-7b6cf358a886"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 2,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.364343479999945, -21.994878563999976]
+                    },
+                    "properties": {
+                        "ObjectID": 2,
+                        "Num_Sequencial": 2,
+                        "Edificação": 2,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "a5d56ff3-d8a9-4329-9cf6-8ea368c87c66"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 3,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.361980654999968, -21.988112225999942]
+                    },
+                    "properties": {
+                        "ObjectID": 3,
+                        "Num_Sequencial": 3,
+                        "Edificação": 3,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "6b13421f-320c-4eb8-a6b1-a897e4478565"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 4,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.362001757999963, -21.987820357999965]
+                    },
+                    "properties": {
+                        "ObjectID": 4,
+                        "Num_Sequencial": 4,
+                        "Edificação": 4,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "0c5e9311-8463-43a5-84dc-55edd66eb28e"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 5,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.361973534999947, -21.987644160999935]
+                    },
+                    "properties": {
+                        "ObjectID": 5,
+                        "Num_Sequencial": 5,
+                        "Edificação": 5,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "7e1d4c1a-85b1-4a9a-976b-c6d23ecb99c1"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 6,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.361966314999961, -21.987475914999948]
+                    },
+                    "properties": {
+                        "ObjectID": 6,
+                        "Num_Sequencial": 6,
+                        "Edificação": 6,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "207ca457-45e7-475a-814b-a1737b196b0a"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 7,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36138624199998, -21.98245843199993]
+                    },
+                    "properties": {
+                        "ObjectID": 7,
+                        "Num_Sequencial": 7,
+                        "Edificação": 7,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "eedab8dd-0299-42a2-b3ab-ff0f73664fd8"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 8,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.364778770999976, -21.981831305999947]
+                    },
+                    "properties": {
+                        "ObjectID": 8,
+                        "Num_Sequencial": 8,
+                        "Edificação": 8,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "b1f170ed-5103-4794-acd1-0537a2f855b6"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 9,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.364867044999983, -21.981859903999975]
+                    },
+                    "properties": {
+                        "ObjectID": 9,
+                        "Num_Sequencial": 9,
+                        "Edificação": 9,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "2712b53a-33e1-4e7a-8701-efb851eaa85a"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 10,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.365461230999983, -21.982066182999972]
+                    },
+                    "properties": {
+                        "ObjectID": 10,
+                        "Num_Sequencial": 12,
+                        "Edificação": 12,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "471bd4f0-bce7-484f-bdb3-bafc6f97250d"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 11,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.365793795999934, -21.982108532999973]
+                    },
+                    "properties": {
+                        "ObjectID": 11,
+                        "Num_Sequencial": 15,
+                        "Edificação": 15,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "df0c98ab-6a58-4f6d-b483-c03a6f0dedc7"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 12,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.365895979999948, -21.982111979999956]
+                    },
+                    "properties": {
+                        "ObjectID": 12,
+                        "Num_Sequencial": 16,
+                        "Edificação": 16,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "3ac7e7a3-b574-4819-841f-272c371b3c4a"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 13,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366065066999965, -21.982134479999957]
+                    },
+                    "properties": {
+                        "ObjectID": 13,
+                        "Num_Sequencial": 18,
+                        "Edificação": 18,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "145c845b-af4d-4a52-8335-130fce7f2641"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 14,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366348761999973, -21.982200675999934]
+                    },
+                    "properties": {
+                        "ObjectID": 14,
+                        "Num_Sequencial": 21,
+                        "Edificação": 21,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Equipamento Público",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "5f7e378e-4306-4093-afdf-effffd8dbbc1"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 15,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366559440999936, -21.982151712999951]
+                    },
+                    "properties": {
+                        "ObjectID": 15,
+                        "Num_Sequencial": 23,
+                        "Edificação": 23,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "710bbf5f-8d05-4867-bcdb-2160d146ff42"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 16,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366709454999977, -21.982179009999982]
+                    },
+                    "properties": {
+                        "ObjectID": 16,
+                        "Num_Sequencial": 25,
+                        "Edificação": 25,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "9e84b5f4-d5f9-4a38-85f9-ffa2d3e45544"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 17,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36499775599998, -21.981908462999968]
+                    },
+                    "properties": {
+                        "ObjectID": 17,
+                        "Num_Sequencial": 10,
+                        "Edificação": 10,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "15f2f1cc-749f-472b-8e17-3d855dfb6415"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 18,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.365268532999949, -21.982025725999961]
+                    },
+                    "properties": {
+                        "ObjectID": 18,
+                        "Num_Sequencial": 11,
+                        "Edificação": 11,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "159d7484-833a-44ff-abbc-3fc811f6fe03"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 19,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36559536599998, -21.982078230999946]
+                    },
+                    "properties": {
+                        "ObjectID": 19,
+                        "Num_Sequencial": 13,
+                        "Edificação": 13,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "8847c011-2343-4a73-b638-4ede0221b94a"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 20,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.365695089999974, -21.982103162999977]
+                    },
+                    "properties": {
+                        "ObjectID": 20,
+                        "Num_Sequencial": 14,
+                        "Edificação": 14,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "7989adb3-07de-46ef-bc25-ba8e4e4b29a6"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 21,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.365963945999965, -21.982124010999939]
+                    },
+                    "properties": {
+                        "ObjectID": 21,
+                        "Num_Sequencial": 17,
+                        "Edificação": 17,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Terreno",
+                        "Tipo de construção": "NA",
+                        "Quantidade de pavimentos": 0,
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "ed6c65cc-b0a9-48cd-b392-154c46540091"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 22,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366163503999985, -21.982140957999945]
+                    },
+                    "properties": {
+                        "ObjectID": 22,
+                        "Num_Sequencial": 19,
+                        "Edificação": 19,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "f8ce0e09-6b15-4ec7-964c-57186ef8d33c"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 23,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36625509199996, -21.982155191999937]
+                    },
+                    "properties": {
+                        "ObjectID": 23,
+                        "Num_Sequencial": 20,
+                        "Edificação": 20,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "4a7fd901-bbb5-4dec-a53e-482998453801"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 24,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366487389999975, -21.982149565999975]
+                    },
+                    "properties": {
+                        "ObjectID": 24,
+                        "Num_Sequencial": 22,
+                        "Edificação": 22,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "5e9b1019-54f0-484a-96b3-b4c2129ca6d6"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 25,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366631172999973, -21.982161142999928]
+                    },
+                    "properties": {
+                        "ObjectID": 25,
+                        "Num_Sequencial": 24,
+                        "Edificação": 24,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "aefd4bdd-c4f5-44ff-9d50-a9547f92fb16"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 26,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366792829999952, -21.982183305999968]
+                    },
+                    "properties": {
+                        "ObjectID": 26,
+                        "Num_Sequencial": 26,
+                        "Edificação": 26,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Equipamento Público",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "4e457691-62c6-4214-b3e1-e4ae73695d78"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 27,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.366883852999933, -21.982179755999937]
+                    },
+                    "properties": {
+                        "ObjectID": 27,
+                        "Num_Sequencial": 27,
+                        "Edificação": 27,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "41cb8670-8ee3-42a4-8856-7207471db922"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 28,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367046763999952, -21.982231720999948]
+                    },
+                    "properties": {
+                        "ObjectID": 28,
+                        "Num_Sequencial": 28,
+                        "Edificação": 28,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "fc1ad9e2-3635-40b8-a1d2-872907ecbc63"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 29,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367293709999956, -21.982307462999927]
+                    },
+                    "properties": {
+                        "ObjectID": 29,
+                        "Num_Sequencial": 29,
+                        "Edificação": 29,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "dd2404cb-2bd0-4a27-9e8b-89d55dda6ee7"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 30,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367370727999969, -21.982394413999941]
+                    },
+                    "properties": {
+                        "ObjectID": 30,
+                        "Num_Sequencial": 30,
+                        "Edificação": 30,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "ecbbad5d-2cc5-4461-99cc-64eb467799ed"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 31,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367677732999937, -21.982946506999951]
+                    },
+                    "properties": {
+                        "ObjectID": 31,
+                        "Num_Sequencial": 33,
+                        "Edificação": 33,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "631574b2-3acc-44a2-8cb3-66fd108cb8d3"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 32,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367490789999977, -21.98250608099994]
+                    },
+                    "properties": {
+                        "ObjectID": 32,
+                        "Num_Sequencial": 31,
+                        "Edificação": 31,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "81fc47b4-14c2-46a5-9bb3-0c1e3b3e23c0"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 33,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367569494999941, -21.982724502999929]
+                    },
+                    "properties": {
+                        "ObjectID": 33,
+                        "Num_Sequencial": 32,
+                        "Edificação": 32,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "cc88ed62-3b75-4a76-a411-eceb23e4eae9"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 34,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367758461999983, -21.982976006999934]
+                    },
+                    "properties": {
+                        "ObjectID": 34,
+                        "Num_Sequencial": 34,
+                        "Edificação": 34,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "1442ed28-7306-4ce5-b589-1b33c6529df6"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 35,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367910767999945, -21.983048824999969]
+                    },
+                    "properties": {
+                        "ObjectID": 35,
+                        "Num_Sequencial": 36,
+                        "Edificação": 36,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "1c038780-bca6-4729-9aaf-39c5327f063b"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 36,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368143669999938, -21.983148405999941]
+                    },
+                    "properties": {
+                        "ObjectID": 36,
+                        "Num_Sequencial": 40,
+                        "Edificação": 40,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "cb203cf9-0fc0-4714-8034-443544070d24"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 37,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368238464999934, -21.98318063499994]
+                    },
+                    "properties": {
+                        "ObjectID": 37,
+                        "Num_Sequencial": 41,
+                        "Edificação": 41,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "9e0522cb-4441-4f7f-9818-fec75a93625f"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 38,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367810141999939, -21.98303839099998]
+                    },
+                    "properties": {
+                        "ObjectID": 38,
+                        "Num_Sequencial": 35,
+                        "Edificação": 35,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "e48bd7e4-485a-4e57-9396-43009d7ee476"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 39,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.367940235999981, -21.983163845999968]
+                    },
+                    "properties": {
+                        "ObjectID": 39,
+                        "Num_Sequencial": 37,
+                        "Edificação": 37,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "bb1b213d-edc1-4ad6-9478-3a1f676d750e"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 40,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368051777999938, -21.983113794999952]
+                    },
+                    "properties": {
+                        "ObjectID": 40,
+                        "Num_Sequencial": 38,
+                        "Edificação": 38,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "e9de0857-89c6-4f56-a98f-8467f8e0ce00"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 41,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368168672999957, -21.983212693999974]
+                    },
+                    "properties": {
+                        "ObjectID": 41,
+                        "Num_Sequencial": 39,
+                        "Edificação": 39,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "c161b8e0-50cf-4750-83ac-3c08a2ad2c28"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 42,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368259634999959, -21.983257499999979]
+                    },
+                    "properties": {
+                        "ObjectID": 42,
+                        "Num_Sequencial": 42,
+                        "Edificação": 42,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "2e3b5c29-734f-4f8c-b2a7-46caba6567e9"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 43,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368431475999955, -21.98322559099995]
+                    },
+                    "properties": {
+                        "ObjectID": 43,
+                        "Num_Sequencial": 43,
+                        "Edificação": 43,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "43aa03cd-84ac-4c18-9843-a2d3149d4056"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 44,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36852586599997, -21.983289399999933]
+                    },
+                    "properties": {
+                        "ObjectID": 44,
+                        "Num_Sequencial": 44,
+                        "Edificação": 44,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "56f33258-132d-4b1a-874a-1cacde6ad7f1"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 45,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368877135999981, -21.983038104999935]
+                    },
+                    "properties": {
+                        "ObjectID": 45,
+                        "Num_Sequencial": 49,
+                        "Edificação": 48,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "80d69a6a-322e-4d35-8e43-fba02a679a8d"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 46,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36902067099993, -21.982824471999947]
+                    },
+                    "properties": {
+                        "ObjectID": 46,
+                        "Num_Sequencial": 51,
+                        "Edificação": 50,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "6e870014-0be2-4ec3-a122-6bdd89d1476d"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 47,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369165727999984, -21.982933989999935]
+                    },
+                    "properties": {
+                        "ObjectID": 47,
+                        "Num_Sequencial": 53,
+                        "Edificação": 52,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "50f6d676-aca3-4602-822e-805dca40e4b2"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 48,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369480318999933, -21.983209706999958]
+                    },
+                    "properties": {
+                        "ObjectID": 48,
+                        "Num_Sequencial": 57,
+                        "Edificação": 56,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "bcbade56-185b-47ac-863a-c28d45a109ce"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 49,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369670283999938, -21.983331871999951]
+                    },
+                    "properties": {
+                        "ObjectID": 49,
+                        "Num_Sequencial": 62,
+                        "Edificação": 61,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "de39edc0-c7dc-45ed-a008-7b085f105b20"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 50,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369773228999975, -21.983381637999969]
+                    },
+                    "properties": {
+                        "ObjectID": 50,
+                        "Num_Sequencial": 63,
+                        "Edificação": 62,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "7a209284-c381-4560-84ee-5cedee7ad3a8"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 51,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36975758899996, -21.98352115199998]
+                    },
+                    "properties": {
+                        "ObjectID": 51,
+                        "Num_Sequencial": 66,
+                        "Edificação": 65,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "809f5d88-cb1f-4bb7-a3c3-464669b99bce"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 52,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36877880399993, -21.983318051999959]
+                    },
+                    "properties": {
+                        "ObjectID": 52,
+                        "Num_Sequencial": 45,
+                        "Edificação": 45,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "806b086d-faa0-47a7-a2d9-0a81d99c5980"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 53,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368821300999969, -21.983268106999958]
+                    },
+                    "properties": {
+                        "ObjectID": 53,
+                        "Num_Sequencial": 46,
+                        "Edificação": 46,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "5fc798cf-c91b-4ed6-803d-6ccb8ee0d9e6"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 54,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368832715999929, -21.983186417999946]
+                    },
+                    "properties": {
+                        "ObjectID": 54,
+                        "Num_Sequencial": 47,
+                        "Edificação": 47,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "ab2c8cd5-07c6-424a-b3ec-61aaa06f240a"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 56,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.368929212999944, -21.982958505999932]
+                    },
+                    "properties": {
+                        "ObjectID": 56,
+                        "Num_Sequencial": 50,
+                        "Edificação": 49,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "b3b0c36e-93b4-45ee-bc6e-0a3a89db2032"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 57,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369117320999976, -21.982877714999972]
+                    },
+                    "properties": {
+                        "ObjectID": 57,
+                        "Num_Sequencial": 52,
+                        "Edificação": 51,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "3dc72168-d9ae-4525-8117-654a7be714a2"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 58,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369291320999935, -21.983020747999944]
+                    },
+                    "properties": {
+                        "ObjectID": 58,
+                        "Num_Sequencial": 55,
+                        "Edificação": 54,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "5a53363f-d287-485c-ba08-b6a56bcb1fa8"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 59,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369230476999974, -21.982975162999935]
+                    },
+                    "properties": {
+                        "ObjectID": 59,
+                        "Num_Sequencial": 54,
+                        "Edificação": 53,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "a4e93ea9-149e-4224-bbc4-cd69f8215fa3"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 60,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369355095999936, -21.983158915999979]
+                    },
+                    "properties": {
+                        "ObjectID": 60,
+                        "Num_Sequencial": 56,
+                        "Edificação": 55,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 7,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 7,
+                        "Observação": "-",
+                        "id_unico": "9c1f7bae-34a4-40c5-af6d-fc38b23a0b8c"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 61,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369394457999931, -21.983230351999964]
+                    },
+                    "properties": {
+                        "ObjectID": 61,
+                        "Num_Sequencial": 58,
+                        "Edificação": 57,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Templo",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "07a21f23-f1f5-49ee-ad52-8af341d7bcd3"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 62,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369468782999945, -21.983289690999982]
+                    },
+                    "properties": {
+                        "ObjectID": 62,
+                        "Num_Sequencial": 60,
+                        "Edificação": 59,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "0075ece8-2aa9-4cf3-996c-8046271ec411"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 63,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369559623999976, -21.983260075999965]
+                    },
+                    "properties": {
+                        "ObjectID": 63,
+                        "Num_Sequencial": 59,
+                        "Edificação": 58,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "21a16631-e5f3-43a4-aac6-fd537fbcb3eb"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 64,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369540739999934, -21.98334777599996]
+                    },
+                    "properties": {
+                        "ObjectID": 64,
+                        "Num_Sequencial": 61,
+                        "Edificação": 60,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "7faf0f21-9032-4cce-b734-5c30752e0917"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 65,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369694460999938, -21.983411583999953]
+                    },
+                    "properties": {
+                        "ObjectID": 65,
+                        "Num_Sequencial": 64,
+                        "Edificação": 63,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "7c75d01d-3d2b-4d5e-9fdf-0fe171645c14"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 66,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36976636299994, -21.983439981999936]
+                    },
+                    "properties": {
+                        "ObjectID": 66,
+                        "Num_Sequencial": 65,
+                        "Edificação": 64,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "5154738f-0ea2-4cff-a846-ee2558d9684b"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 67,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.36982898499997, -21.983518358999959]
+                    },
+                    "properties": {
+                        "ObjectID": 67,
+                        "Num_Sequencial": 67,
+                        "Edificação": 66,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "c3914491-03fc-4797-b433-2c2d55f1d5d3"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 68,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369832534999944, -21.983598142999938]
+                    },
+                    "properties": {
+                        "ObjectID": 68,
+                        "Num_Sequencial": 68,
+                        "Edificação": 67,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "69530893-e5d3-4478-885c-c9ac523af5ad"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 69,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.369987678999962, -21.983595223999941]
+                    },
+                    "properties": {
+                        "ObjectID": 69,
+                        "Num_Sequencial": 69,
+                        "Edificação": 68,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "60f8c060-8181-45f6-91ab-4cdc058b1e54"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 70,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370236523999949, -21.983694816999957]
+                    },
+                    "properties": {
+                        "ObjectID": 70,
+                        "Num_Sequencial": 73,
+                        "Edificação": 72,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "26d8f5f5-0a7e-4dc7-8327-16c8fee9f94d"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 71,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370555760999935, -21.983686380999927]
+                    },
+                    "properties": {
+                        "ObjectID": 71,
+                        "Num_Sequencial": 75,
+                        "Edificação": 74,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "d5cc2407-8de9-40fb-8fb8-8e6c8e6279b0"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 72,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370608829999981, -21.983727836999947]
+                    },
+                    "properties": {
+                        "ObjectID": 72,
+                        "Num_Sequencial": 76,
+                        "Edificação": 75,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "974c4b6f-47d1-426d-868e-6c89ac00e0cb"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 73,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370833485999981, -21.983726704999981]
+                    },
+                    "properties": {
+                        "ObjectID": 73,
+                        "Num_Sequencial": 79,
+                        "Edificação": 78,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "da5da310-5aa8-4eea-9f8d-e102dc9fa1fb"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 74,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370007224999938, -21.983671534999928]
+                    },
+                    "properties": {
+                        "ObjectID": 74,
+                        "Num_Sequencial": 70,
+                        "Edificação": 69,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "61cce8f9-be3d-4113-a5b3-4c10d502a3f6"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 75,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370106591999956, -21.983637077999958]
+                    },
+                    "properties": {
+                        "ObjectID": 75,
+                        "Num_Sequencial": 71,
+                        "Edificação": 70,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "f5bf126f-57b6-46c2-b93d-47e74bff3227"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 76,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370179765999978, -21.983650943999976]
+                    },
+                    "properties": {
+                        "ObjectID": 76,
+                        "Num_Sequencial": 72,
+                        "Edificação": 71,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "b3ab7700-1666-4086-b520-e70ff933b9b4"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 77,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370325044999959, -21.98368537999994]
+                    },
+                    "properties": {
+                        "ObjectID": 77,
+                        "Num_Sequencial": 74,
+                        "Edificação": 73,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "bdf0415b-79e8-4fc9-8845-1b4000029183"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 78,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370687817999965, -21.983696835999979]
+                    },
+                    "properties": {
+                        "ObjectID": 78,
+                        "Num_Sequencial": 77,
+                        "Edificação": 76,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "f1e04351-8c0f-4b56-9583-8f76b49fa925"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 79,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.370734574999972, -21.983736046999979]
+                    },
+                    "properties": {
+                        "ObjectID": 79,
+                        "Num_Sequencial": 78,
+                        "Edificação": 77,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "a4ea8b89-b480-490f-a509-b703521b2078"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 80,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.376634434999971, -21.989196223999954]
+                    },
+                    "properties": {
+                        "ObjectID": 80,
+                        "Num_Sequencial": 109,
+                        "Edificação": 108,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "084659fe-5f57-40f8-96a1-cca0fdba1556"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 81,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.376782558999935, -21.989044544999956]
+                    },
+                    "properties": {
+                        "ObjectID": 81,
+                        "Num_Sequencial": 108,
+                        "Edificação": 107,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "5c5cc4c1-ac2a-4ee8-b737-9b16227afdf9"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 82,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.371147769999936, -21.983786935999944]
+                    },
+                    "properties": {
+                        "ObjectID": 82,
+                        "Num_Sequencial": 80,
+                        "Edificação": 79,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Terreno",
+                        "Tipo de construção": "NA",
+                        "Quantidade de pavimentos": 0,
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "c25814d6-319d-4285-9221-e835e2bf9ed2"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 83,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375261992999981, -21.983503506999966]
+                    },
+                    "properties": {
+                        "ObjectID": 83,
+                        "Num_Sequencial": 105,
+                        "Edificação": 104,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "addaceac-4a19-4dcd-a1b0-de02820ed16e"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 84,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375504347999936, -21.983471312999939]
+                    },
+                    "properties": {
+                        "ObjectID": 84,
+                        "Num_Sequencial": 107,
+                        "Edificação": 106,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "23566ac4-d1b9-425a-b6e2-211eafb73e05"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 85,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375365037999984, -21.983452206999971]
+                    },
+                    "properties": {
+                        "ObjectID": 85,
+                        "Num_Sequencial": 106,
+                        "Edificação": 105,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "677c718b-e1f9-4297-9aef-a8ca9696fc05"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 86,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375203936999981, -21.983431953999968]
+                    },
+                    "properties": {
+                        "ObjectID": 86,
+                        "Num_Sequencial": 104,
+                        "Edificação": 103,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "cb9210d6-ae5f-4b29-aa63-27c8731122f4"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 87,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375114786999973, -21.98348570099995]
+                    },
+                    "properties": {
+                        "ObjectID": 87,
+                        "Num_Sequencial": 103,
+                        "Edificação": 102,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "f55f135b-40e9-467f-898b-f6c80c8f7a8e"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 88,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375032637999936, -21.983435102999977]
+                    },
+                    "properties": {
+                        "ObjectID": 88,
+                        "Num_Sequencial": 101,
+                        "Edificação": 100,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "a0a1442a-b8a1-488a-82b3-c9336ed4b24b"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 89,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374837431999936, -21.98340914299996]
+                    },
+                    "properties": {
+                        "ObjectID": 89,
+                        "Num_Sequencial": 99,
+                        "Edificação": 98,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "7f95f29d-33fa-4720-8e51-d5b0ce6e7ad3"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 90,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374642514999948, -21.983362339999928]
+                    },
+                    "properties": {
+                        "ObjectID": 90,
+                        "Num_Sequencial": 97,
+                        "Edificação": 96,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "d956b790-6397-40b0-ab99-7ac0179f350e"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 91,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374444332999985, -21.983393295999974]
+                    },
+                    "properties": {
+                        "ObjectID": 91,
+                        "Num_Sequencial": 95,
+                        "Edificação": 94,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "abb55790-7cde-41f9-946e-3d34218953e8"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 92,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374163301999943, -21.983349425999961]
+                    },
+                    "properties": {
+                        "ObjectID": 92,
+                        "Num_Sequencial": 93,
+                        "Edificação": 92,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "ec9b93a7-4cc7-45e8-ab19-25ed31fbef6e"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 93,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.375097152999956, -21.983410503999949]
+                    },
+                    "properties": {
+                        "ObjectID": 93,
+                        "Num_Sequencial": 102,
+                        "Edificação": 101,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "4cee4177-a62b-4bf6-bb85-0f758f76931c"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 94,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374928585999953, -21.983486694999954]
+                    },
+                    "properties": {
+                        "ObjectID": 94,
+                        "Num_Sequencial": 100,
+                        "Edificação": 99,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "d84d9ec1-4bcb-49a2-b902-a8ffe3161833"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 95,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374696616999984, -21.983429711999975]
+                    },
+                    "properties": {
+                        "ObjectID": 95,
+                        "Num_Sequencial": 98,
+                        "Edificação": 97,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "87a90e22-0d0e-4546-a52a-2136a93d877b"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 96,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374538745999985, -21.983430707999958]
+                    },
+                    "properties": {
+                        "ObjectID": 96,
+                        "Num_Sequencial": 96,
+                        "Edificação": 95,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "0e31d100-9dc4-4a2b-8228-5251241d7f97"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 97,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.374334035999937, -21.983343484999978]
+                    },
+                    "properties": {
+                        "ObjectID": 97,
+                        "Num_Sequencial": 94,
+                        "Edificação": 93,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "53d262c2-0ba3-4870-8cfd-9efd3ad47d06"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 98,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.373219870999947, -21.983306880999976]
+                    },
+                    "properties": {
+                        "ObjectID": 98,
+                        "Num_Sequencial": 90,
+                        "Edificação": 89,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Serviços",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "2f58c5a2-1134-46a0-8015-29899a89da96"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 99,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.373741665999944, -21.983241801999952]
+                    },
+                    "properties": {
+                        "ObjectID": 99,
+                        "Num_Sequencial": 92,
+                        "Edificação": 91,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "0f08f780-1638-4f99-906c-d62dff86b507"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 100,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.373382942999967, -21.98331976299994]
+                    },
+                    "properties": {
+                        "ObjectID": 100,
+                        "Num_Sequencial": 91,
+                        "Edificação": 90,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Serviços",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "c4f5cf57-5a96-486d-aa0c-8ef4347d74c8"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 101,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.373154581999984, -21.983219061999932]
+                    },
+                    "properties": {
+                        "ObjectID": 101,
+                        "Num_Sequencial": 89,
+                        "Edificação": 88,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Templo",
+                        "Quantidade de pavimentos": 1,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 1,
+                        "Observação": "-",
+                        "id_unico": "61158dff-1de7-4cb9-8210-d80ca69f3edb"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 102,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.373056903999952, -21.983267420999937]
+                    },
+                    "properties": {
+                        "ObjectID": 102,
+                        "Num_Sequencial": 88,
+                        "Edificação": 87,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Serviços",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "df55a25e-d29f-42e5-9f6f-53167c5ef328"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 104,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.372352570999965, -21.983371742999964]
+                    },
+                    "properties": {
+                        "ObjectID": 104,
+                        "Num_Sequencial": 86,
+                        "Edificação": 85,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "225eb3ec-24fb-4496-9c25-7b3859375207"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 107,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.37169161199995, -21.98353801899998]
+                    },
+                    "properties": {
+                        "ObjectID": 107,
+                        "Num_Sequencial": 84,
+                        "Edificação": 83,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "6dc3e81f-7e74-45ea-bb60-5472ad30a9f3"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 108,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.371363525999982, -21.983635330999959]
+                    },
+                    "properties": {
+                        "ObjectID": 108,
+                        "Num_Sequencial": 81,
+                        "Edificação": 80,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "f2aed395-6c0d-4425-9a9f-feab4d6fa9d0"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 109,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.372642022999969, -21.983292303999974]
+                    },
+                    "properties": {
+                        "ObjectID": 109,
+                        "Num_Sequencial": 87,
+                        "Edificação": 86,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Residencial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "eef2c7dc-07b8-4782-8b52-ec8be08bc083"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 111,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.371790577999946, -21.98356260099996]
+                    },
+                    "properties": {
+                        "ObjectID": 111,
+                        "Num_Sequencial": 85,
+                        "Edificação": 84,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Comercial",
+                        "Quantidade de pavimentos": 2,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 2,
+                        "Observação": "-",
+                        "id_unico": "16889c1f-db3e-4ba6-b04c-f12e2066f04d"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 112,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.371623016999933, -21.983613742999978]
+                    },
+                    "properties": {
+                        "ObjectID": 112,
+                        "Num_Sequencial": 83,
+                        "Edificação": 82,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 3,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 3,
+                        "Observação": "-",
+                        "id_unico": "a5bfaba7-ba4b-494a-87a9-e03a7aee8586"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "id": 113,
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [-42.371519520999982, -21.983599277999929]
+                    },
+                    "properties": {
+                        "ObjectID": 113,
+                        "Num_Sequencial": 82,
+                        "Edificação": 81,
+                        "Data": "2025-11-05",
+                        "Município": "Cantagalo",
+                        "Tipo de atividade": "Mista",
+                        "Quantidade de pavimentos": 4,
+                        "Tipo de construção": "Alvenaria",
+                        "Pavimentos": 4,
+                        "Observação": "-",
+                        "id_unico": "5e9e69c3-8fa2-4257-8659-b5923f31f705"
+                    }
+                }
+            ]
+        };
+
+        var map;
+        var todosOsDados = dadosGeoJSON;
+        var camadaAtual;
+
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        });
+
+        var esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri',
+            maxZoom: 19
+        });
+
+        var googleSatellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '© Google'
+        });
+
+        var bingSatellite = L.tileLayer('https://tiles.arcgis.com/tiles/nzS0F0zdNLvs7nc8/arcgis/rest/services/bing_satellite/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '© Bing, © Esri'
+        });
+
+        var baseMaps = {
+            "🗺️ OpenStreetMap": osm,
+            "🛰️ Esri Satélite": esriSatellite,
+            "🛰️ Google Satélite": googleSatellite,
+            "🛰️ Bing Satélite": bingSatellite
+        };
+
+        var iconeCirculoPreto = L.divIcon({
+            className: '',
+            html: '<div style="background: black; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+            popupAnchor: [0, -8]
+        });
+
+        function criarPopup(props) {
+            var edificacao = props.Edificação || props.Num_Sequencial || props.ObjectID || '?';
+            var data = props.Data || 'Não informada';
+            var municipio = props.Município || 'Cantagalo';
+            var atividade = props['Tipo de atividade'] || 'Não informado';
+            var qtdPav = props['Quantidade de pavimentos'] || props.Pavimentos || 0;
+            var construcao = props['Tipo de construção'] || 'Não informado';
+            var pavimentos = props.Pavimentos || props['Quantidade de pavimentos'] || 0;
+            var observacao = props.Observação || '-';
+            var idUnico = props.id_unico || '';
+            
+            var nomeFoto = idUnico ? `${idUnico}.jpg` : '';
+            var caminhoFoto = nomeFoto ? `fotos/${nomeFoto}` : '';
+            
+            var fotoHtml = '';
+            if (caminhoFoto) {
+                fotoHtml = `
+                    <div style="text-align: center; margin-top: 15px;">
+                        <img src="${caminhoFoto}" 
+                             alt="Foto" 
+                             onclick="abrirModal('${caminhoFoto}')"
+                             onerror="this.style.display='none'; this.parentElement.innerHTML += '<div style=\'color: #e74c3c; padding: 10px; font-style: italic;\'>📷 Foto não disponível</div>';"
+                             style="max-width: 100%; max-height: 150px; border-radius: 6px; cursor: pointer; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="margin-top: 8px; color: #7f8c8d; font-size: 0.75rem; font-family: monospace; background: #f8f9fa; padding: 6px; border-radius: 4px; word-break: break-all;">
+                            ${nomeFoto}
+                        </div>
+                    </div>
+                `;
+            } else {
+                fotoHtml = `
+                    <div style="text-align: center; margin-top: 15px; color: #95a5a6; font-style: italic;">
+                        📷 Sem foto
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="custom-popup">
+                    <div class="popup-content">
+                        <div class="popup-row">
+                            <span class="popup-label">Edificação</span>
+                            <span class="popup-value"><strong>${edificacao}</strong></span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Data</span>
+                            <span class="popup-value">${data}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Município</span>
+                            <span class="popup-value">${municipio}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Tipo de atividade</span>
+                            <span class="popup-value">${atividade}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Quantidade de pavimentos</span>
+                            <span class="popup-value">${qtdPav}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Tipo de construção</span>
+                            <span class="popup-value">${construcao}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Pavimentos</span>
+                            <span class="popup-value">${pavimentos}</span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-label">Observação</span>
+                            <span class="popup-value">${observacao}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="popup-foto">
+                        ${fotoHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function abrirModal(src) {
+            document.getElementById('modalImage').src = src;
+            document.getElementById('imageModal').style.display = 'block';
+        }
+
+        function fecharModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') fecharModal();
+        });
+
+        function initMap() {
+            document.getElementById('loading').style.display = 'none';
+            
+            map = L.map('map', {
+                center: [-21.98, -42.36],
+                zoom: 13,
+                layers: [osm]
+            });
+            
+            L.control.layers(baseMaps, null, {
+                position: 'topright',
+                collapsed: false
+            }).addTo(map);
+            
+            carregarDados(todosOsDados);
+            
+            document.getElementById('totalPontos').textContent = todosOsDados.features.length;
+            document.getElementById('legendTotal').textContent = todosOsDados.features.length;
+        }
+
+        function carregarDados(dados) {
+            if (camadaAtual) map.removeLayer(camadaAtual);
+            
+            camadaAtual = L.geoJSON(dados, {
+                pointToLayer: function(feature, latlng) {
+                    return L.marker(latlng, { icon: iconeCirculoPreto });
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties) {
+                        layer.bindPopup(criarPopup(feature.properties));
+                    }
+                }
+            }).addTo(map);
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>

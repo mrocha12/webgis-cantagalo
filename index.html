@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadastro de Edificações - Cantagalo</title>
-    <base href="/webgis-cantagalo/">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <style>
@@ -12,6 +11,7 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #map { height: 100vh; width: 100%; }
         
+        /* Painel de Controle - CANTO INFERIOR DIREITO */
         .control-panel {
             position: absolute;
             bottom: 30px;
@@ -32,6 +32,7 @@
             border-bottom: 3px solid #3498db;
         }
         
+        /* POPUP SEM TÍTULO */
         .custom-popup {
             min-width: 320px;
             max-width: 350px;
@@ -68,6 +69,7 @@
             font-size: 1.1rem;
         }
         
+        /* Área da foto */
         .popup-foto {
             margin: 15px 0 5px 0;
             text-align: center;
@@ -99,6 +101,7 @@
             word-break: break-all;
         }
         
+        /* LEGENDA - CANTO INFERIOR ESQUERDO */
         .legend {
             position: absolute;
             bottom: 30px;
@@ -123,6 +126,7 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
         
+        /* Modal para fotos */
         .modal {
             display: none;
             position: fixed;
@@ -189,11 +193,13 @@
 <body>
     <div id="map"></div>
     
+    <!-- Modal para fotos -->
     <div id="imageModal" class="modal">
         <span class="close" onclick="fecharModal()">&times;</span>
         <img class="modal-content" id="modalImage">
     </div>
     
+    <!-- Painel de Controle - INFERIOR DIREITO -->
     <div class="control-panel">
         <h2>📋 Cadastro de Edificações</h2>
         <p><strong>Município:</strong> Cantagalo</p>
@@ -203,6 +209,7 @@
         </p>
     </div>
     
+    <!-- LEGENDA - INFERIOR ESQUERDO -->
     <div class="legend">
         <span class="legend-circle"></span> Edificações cadastradas (<span id="legendTotal">108</span>)
     </div>
@@ -2492,6 +2499,7 @@
         var todosOsDados = dadosGeoJSON;
         var camadaAtual;
 
+        // ===== BASEMAPS =====
         var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
@@ -2513,6 +2521,7 @@
             attribution: '© Bing, © Esri'
         });
 
+        // Objeto com os basemaps
         var baseMaps = {
             "🗺️ OpenStreetMap": osm,
             "🛰️ Esri Satélite": esriSatellite,
@@ -2520,6 +2529,7 @@
             "🛰️ Bing Satélite": bingSatellite
         };
 
+        // Ícone: CÍRCULO PRETO PEQUENO
         var iconeCirculoPreto = L.divIcon({
             className: '',
             html: '<div style="background: black; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>',
@@ -2528,6 +2538,7 @@
             popupAnchor: [0, -8]
         });
 
+        // Função para criar o popup SEM TÍTULO
         function criarPopup(props) {
             var edificacao = props.Edificação || props.Num_Sequencial || props.ObjectID || '?';
             var data = props.Data || 'Não informada';
@@ -2608,6 +2619,7 @@
             `;
         }
 
+        // Funções do modal
         function abrirModal(src) {
             document.getElementById('modalImage').src = src;
             document.getElementById('imageModal').style.display = 'block';
@@ -2621,6 +2633,7 @@
             if (e.key === 'Escape') fecharModal();
         });
 
+        // Inicializar mapa
         function initMap() {
             document.getElementById('loading').style.display = 'none';
             
@@ -2630,6 +2643,7 @@
                 layers: [osm]
             });
             
+            // Controle de basemaps - CANTO SUPERIOR DIREITO
             L.control.layers(baseMaps, null, {
                 position: 'topright',
                 collapsed: false
